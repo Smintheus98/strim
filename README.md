@@ -35,4 +35,4 @@ After installation of Nim use:
 $ nimble install
 $ nimble release
 ```
-to install the programs dependencies and compile the program.
+to install the programs dependencies and compile the program with release options (optimized)
