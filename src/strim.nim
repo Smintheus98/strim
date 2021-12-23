@@ -1,116 +1,100 @@
-import std/[strutils, strformat, unicode]
+import std/[strformat, strutils, sequtils]
+import substr, errutils
 import cligen
-import utils
-
-
-
-proc substrByIdx(s: string; idx: int): string =
-  if idx notin 0..s.high:
-    return s
-  return s[idx .. ^1]
-
-
-proc substrByIdx(s: string; idx1, idx2: int; includeBorder = false): string =
-  var
-    i1 = idx1
-    i2 = idx2
-    str = s
-  
-  if i1 > i2:
-    (i1, i2) = (i2, i1)
-    str = s.reversed
-
-  if i1 notin 0..s.high or i2 notin 0..s.len:
-    return s
-
-  if includeBorder:
-    return str[i1 .. i2]
-  else:
-    return str[i1 ..< i2]
-
-
-proc substrByIdxLen(s: string; idx, length: int; includeBorder = false): string =
-  if idx notin 0..s.high or idx+length notin 0..s.len:
-    return s
-  if includeBorder:
-    return s[idx .. idx+length]
-  else:
-    return s[idx ..< idx+length]
-
-
-proc substrBefore(s, sub: string; n = 1; includesub = false): string =
-  let pos = s.findNth(sub, n)
-
-  if pos < 0:
-    return s
-
-  if includesub:
-    return s[0..<pos+sub.len]
-  else:
-    return s[0..<pos]
-
-
-proc substrAfter(s, sub: string; n = 1; includesub = false): string =
-  let pos = s.findNth(sub, n)
-
-  if pos < 0:
-    return s
-
-  if includesub:
-    return s[pos..s.high]
-  else:
-    return s[pos+sub.len..s.high]
 
 
 type Mode = enum
   None, Indices, IndexLength, Before, After
 
 
-proc checkParameterCombination(index: string; length: int; before, after: string; occourrence: int; includeBorder: bool): tuple[valid: bool, mode: Mode] =
-  # TODO: test only simple cases and keep error messages simple
-  var 
-    mode = Mode.None
-    separators = {',',';','-'}
-
-  if index != "" and index.split(separators).len == 2:
-    mode = Mode.Indices
-  if index != "" and index.split(separators).len == 1:
-    mode = Mode.Indices
-  if index != "" and index.split(separators).len > 2:
-    error fmt"Too many values for Parameter '--index': {index.split(separators).len}"
-    return (false, None)
-    
-  if length != 0 and ( before != "" or after != "" or occourrence != 0 ):
-    discard
-  return (true, mode)
+proc parseIndices(s: string): seq[int] =
+  let separators = {',',';','-'}
+  return s.split(separators).map parseInt
 
 
-proc strim(index = ""; length = 0; before = ""; after = ""; occourrence = 0; includeBorder = true; strparam: seq[string]): int =
+proc checkOptionCombination(index: string; length: int; before, after: string; occourrence: int; withborder: bool): Mode =
+  # DONE: test only simple cases and keep error messages simple
+  var mode = Mode.None
+  block:
+    # mode: Indices, IndexLength
+    if index != "":
+      var idcs: seq[int]
+      try:
+        idcs = index.parseIndices
+      except:
+        quitWith "Invalid value format for `--index` option", QuitFailure
+
+      if idcs.len > 2:
+        quitWith fmt"Too many values for option '--index': {idcs.len}", QuitFailure
+      if idcs.len == 2:
+        mode = Mode.Indices
+      elif idcs.len == 1:
+        if length > 0:
+          mode = Mode.IndexLength
+        else:
+          mode = Mode.Indices
+
+      if mode in {Indices, IndexLength} and
+          ( before != "" or
+            after  != "" or
+            occourrence != 0 or
+            withborder != false ):
+        quitWith "Incompatible options used.\pSee option `-h` for more information", QuitFailure
+  block:
+    # mode: Before
+    if before != "":
+      mode = Mode.Before
+      if index != "" or length != 0 or after != "":
+        quitWith "Incompatible options used.\pSee option `-h` for more information", QuitFailure
+  block:
+    # mode: After
+    if after != "":
+      mode = Mode.After
+      if index != "" or length != 0 or before != "":
+        quitWith "Incompatible options used.\pSee option `-h` for more information", QuitFailure
+  block:
+    # mode: None
+    if mode == Mode.None:
+      quitWith "Operation mode ambiguous.\pUse one of options: [ `--index`, `--before`, `--after` ]", QuitFailure
+
+  return mode
+
+
+proc strim(index = ""; length = 0; before = ""; after = ""; occourrence = 0; withborder = false; strparam: seq[string]): int =
   ## Usage:
   ## (1) substr -i|--index=idx1[,idx2]  ["string"]
   ## (2) substr -i|--index=idx [-l|--length=length]  ["string"]
-  ## (3) substr -b|--before=CHAR|STRING  [-n|--occourrence=1]  [-c|--include]  ["string"]
-  ## (4) substr -a|--after=CHAR|STRING  [-n|--occourrence=1]  [-c|--include]  ["string"]
+  ## (3) substr -b|--before=SUBSTRING  [-n|--occourrence=1]  [-w|--withborder]  ["string"]
+  ## (4) substr -a|--after=SUBSTRING  [-n|--occourrence=1]  [-w|--withborder]  ["string"]
   ## 
   ## All modes(1-4) may conflict with each other! 
   ## -> prevent misuse by appropriate detection and handling of not allowed combination of modes
   var
     instr: string
-
-  # TODO: Check if combination of used parameters is valid
-  discard checkParameterCombination(index, length, before, after, occourrence, includeBorder)
-
-  # TODO: Parse parameters
+    outstr: string
+    mode = checkOptionCombination(index, length, before, after, occourrence, withborder)
   
-  if strparam.len > 0:
-    if strparam.len == 1:
-      instr = strparam[0]
-    else:
-      error "Too many arguments"
-  else:
+  if strparam.len > 1:
+    quitWith "Too many arguments", QuitFailure
+  elif strparam.len == 1:   # If string given use it
+    instr = strparam[0]
+  else:                     # Otherwise read from stdin
     instr = stdin.readLine
 
-  
+  # Apply arguments
+  case mode:
+    of Mode.Indices:
+      outstr = instr.substrByIdx(index.parseIndices)
+    of Mode.IndexLength:
+      outstr = instr.substrByIdxLen(index.parseIndices[0], length)
+    of Mode.Before:
+      outstr = instr.substrBefore(before, occourrence, withborder)
+    of Mode.After:
+      outstr = instr.substrAfter(after, occourrence, withborder)
+    of Mode.None:
+      discard
+
+  echo outstr
   return QuitSuccess
 
 
