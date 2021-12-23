@@ -8,7 +8,7 @@ type Mode = enum
 
 
 proc parseIndices(s: string): seq[int] =
-  let separators = {',',';','-'}
+  let separators = {',',';',':'}
   return s.split(separators).map parseInt
 
 
@@ -27,6 +27,8 @@ proc checkOptionCombination(index: string; length: int; before, after: string; o
       if idcs.len > 2:
         quitWith fmt"Too many values for option '--index': {idcs.len}", QuitFailure
       if idcs.len == 2:
+        if length != 0:
+          quitWith "Incompatible options used.\pSee option `-h` for more information", QuitFailure
         mode = Mode.Indices
       elif idcs.len == 1:
         if length > 0:
@@ -61,14 +63,19 @@ proc checkOptionCombination(index: string; length: int; before, after: string; o
 
 
 proc strim(index = ""; length = 0; before = ""; after = ""; occourrence = 0; withborder = false; strparam: seq[string]): int =
-  ## Usage:
+  ## Modes:
+  ##
   ## (1) substr -i|--index=idx1[,idx2]  ["string"]
+  ##
   ## (2) substr -i|--index=idx [-l|--length=length]  ["string"]
-  ## (3) substr -b|--before=SUBSTRING  [-n|--occourrence=1]  [-w|--withborder]  ["string"]
-  ## (4) substr -a|--after=SUBSTRING  [-n|--occourrence=1]  [-w|--withborder]  ["string"]
+  ## 
+  ## (3) substr -b|--before=SUBSTRING  [-o|--occourrence=1]  [-w|--withborder]  ["string"]
+  ## 
+  ## (4) substr -a|--after=SUBSTRING  [-o|--occourrence=1]  [-w|--withborder]  ["string"]
   ## 
   ## All modes(1-4) may conflict with each other! 
   ## -> prevent misuse by appropriate detection and handling of not allowed combination of modes
+  ##
   var
     instr: string
     outstr: string
