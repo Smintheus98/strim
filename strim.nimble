@@ -18,7 +18,7 @@ requires "cligen"
 
 # tasks
 task test, "Run Tests":
-  exec "nim c -r --gc:arc -outDir:tests tests/test.nim"
+  exec "nim c -r --gc:arc --outDir:tests tests/test.nim"
   exec "tests/test.sh"
 
 task clean, "Clean Up Binary Directory":
