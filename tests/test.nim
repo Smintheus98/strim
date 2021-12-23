@@ -1,4 +1,4 @@
-import ../src/strim {.all.}
+import ../src/substr
 
 ## Expected behaviour:
 ## TODO: Define expected behaviour
@@ -23,4 +23,4 @@ doAssert substrAfter(s, "s", -2, true) == "s er sagt."
 doAssert substrAfter(s, "s", 100) == s
 doAssert substrAfter(s, "s", -100) == s
 
-echo "Test Passed Successfully"
+echo "Internal Test Passed Successfully"

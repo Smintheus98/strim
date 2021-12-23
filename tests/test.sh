@@ -1,3 +1,5 @@
 #!/usr/bin/bash
 
-echo "Test Passed Successfully"
+# TODO: create testcases
+
+echo "External Test Passed Successfully"
