@@ -34,6 +34,9 @@ $ cd strim
 After installation of Nim use:
 ```
 $ nimble install
-$ nimble release
 ```
-to install the programs dependencies and compile the program with release options (optimized)
+to install the programs dependencies and compile and install the program afterwards.
+
+The program will be installed to `$HOME/.nimble/bin`.
+Make sure to include that directory into your system path.
+For explicit instructions see beginning of this section.
